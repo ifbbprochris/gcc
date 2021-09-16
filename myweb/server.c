@@ -108,48 +108,85 @@ void task_pool_free(Task_Pool *tp)
     return;
 }
 
+void *up_server(void *arg)
+{
+    pthread_detach(pthread_self());
+
+    Task_Pool *tp = arg;
+    char buf[MAX_LINE];
+    int n, i;
+
+    while (1)
+    {
+        Task tmp = task_pool_pop(tp);
+        int connfd = tmp.fd;
+        printf("get task fd=%d\n", connfd);
+        while (1)
+        {
+            n = read(connfd, buf, MAX_LINE);
+            if (!strncmp(buf, "quit", 4))
+                break;
+            write(1, buf, n);
+            for (i = 0; i < n; i++)
+                buf[i] = toupper(buf[i]);
+            write(connfd, buf, n);
+        }
+        printf("finish task fd=%d\n", connfd);
+        close(connfd);
+    }
+
+    return (void *)0;
+}
+
 int main()
 {
 
     char buf[MAX_LINE];
 
-    int sockfd;
+    int connfd, listenfd;
     struct sockaddr_in servaddr, cliaddr;
     socklen_t cliaddr_len;
+    int n, i;
 
     char str[INET_ADDRSTRLEN];
-    
 
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    Task_Pool *tp = task_pool_init();
+
+    pthread_t tid;
+    for (i = 0; i < 4; i++)
+    {
+        pthread_create(&tid, NULL, up_server, (void *)tp);
+        printf("new thread is %#lx\n", tid);
+    }
+
+    listenfd = socket(AF_INET, SOCK_STREAM, 0);
 
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(SERV_PORT);
 
-    bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
-    printf("updserver ready~\n");
+    if (bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+        prreixt("bind");
 
-    int n, i;
+    if (listen(listenfd, 2) < 0)
+        prreixt("listend");
+
+    printf("accepting connections...\n");
+
     while (1)
     {
-        n = recvfrom(sockfd, buf, MAX_LINE, 0, (struct sockaddr *)&cliaddr, &cliaddr_len);
-        if (n < 0)
-        {
-            prreixt("recvfrom");
-        }
+        cliaddr_len = sizeof(cliaddr);
+        connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &cliaddr_len);
+        if (connfd < 0)
+            prreixt("accept");
 
         printf("receive from %s:%d\n", inet_ntop(AF_INET, &cliaddr.sin_addr, str, sizeof(str)), ntohs(cliaddr.sin_port));
 
-        for (i = 0; i < n; i++)
-        {
-            buf[i] = toupper(buf[i]);
-        }
-
-        sendto(sockfd, buf, n, 0, (struct sockaddr *)&cliaddr, sizeof(cliaddr));
+        // 进来玩
+        task_pool_push(tp, connfd);
     }
 
-    close(sockfd);
-
+    task_pool_free(tp);
     return 0;
 }

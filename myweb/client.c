@@ -18,21 +18,27 @@
 int main(void) {
     struct sockaddr_in servaddr;
     int sockfd;
-    int n;
+   
     char buf[MAX_LINE];
 
-    sockfd=socket(AF_INET, SOCK_DGRAM, 0);
+    sockfd=socket(AF_INET, SOCK_STREAM, 0);
 
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(SERV_PORT);
 
     inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);
-
+    connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+    int n;
     while (n=read(0, buf, MAX_LINE))
     {
-        n=sendto(sockfd, buf, n, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
-        n=recvfrom(sockfd, buf, MAX_LINE, 0, NULL, 0);
+       
+        write(sockfd, buf, n);
+        if(!strncmp(buf, "quit", 4)) {
+            break;
+        }
+        n=read(sockfd, buf, MAX_LINE);
+        printf("response from server:\n");
         write(1, buf, n);
     }
 
