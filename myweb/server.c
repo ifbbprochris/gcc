@@ -179,6 +179,7 @@ int main()
 
     while (1)
     {
+        // epoll wait array function begin
         cliaddr_len = sizeof(cliaddr);
         connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &cliaddr_len);
         if (connfd < 0)
@@ -188,6 +189,8 @@ int main()
 
         // 进来玩
         task_pool_push(tp, connfd);
+        // epoll wait array function end
+
     }
 
     task_pool_free(tp);
