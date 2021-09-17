@@ -161,6 +161,9 @@ int main()
 
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
 
+    //create epoll create
+    int epfd = epoll_create(256);
+
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
